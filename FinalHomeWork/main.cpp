@@ -10,6 +10,8 @@
 #include <functional>
 #include <locale>
 #include <codecvt>
+#include <conio.h>
+#include <windows.h>
 
 using namespace std;
 
@@ -85,9 +87,7 @@ public:
 private:
     // Функция для корректного расчета длины строки UTF-8
     static size_t calculateUtf8Length(const string& str) {
-        wstring_convert<codecvt_utf8<wchar_t>> converter;
-        wstring wide = converter.from_bytes(str);
-        return wide.length();
+        return str.length(); // Для Windows достаточно length()
     }
 
     // Печать горизонтальной линии
@@ -437,180 +437,298 @@ void clearInputBuffer() {
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 }
 
-// Основное меню программы
-int main() {
-    ScheduleDatabase db;
-    int choice;
-
-    while (true) {
-        cout << "\n=== Управление базой данных расписания ===" << endl;
-        cout << "1. Загрузить БД из файла" << endl;
-        cout << "2. Просмотреть БД" << endl;
-        cout << "3. Добавить запись" << endl;
-        cout << "4. Удалить запись" << endl;
-        cout << "5. Сохранить БД в файл" << endl;
-        cout << "6. Сортировать по ID" << endl;
-        cout << "7. Поиск по ID" << endl;
-        cout << "8. Фильтр по диапазону дней" << endl;
-        cout << "9. Проверить накладки" << endl;
-        cout << "10. Расписание группы" << endl;
-        cout << "0. Выход" << endl;
-        cout << "Выбор: ";
-        
-        cin >> choice;
-        if (cin.fail()) {
-            clearInputBuffer();
-            cout << "Ошибка ввода. Пожалуйста, введите число." << endl;
-            continue;
-        }
-
-        switch (choice) {
-            case 1: {
-                string filename;
-                cout << "Имя файла: ";
-                cin >> filename;
-                db.loadFromFile(filename);
-                break;
-            }
-            case 2:
-                db.displayAll();
-                break;
-            case 3: {
-                int id;
-                string group, subject, teacher;
-                unsigned char day, period;
-                int temp;
-                
-                cout << "ID: "; 
-                if (!(cin >> id)) {
-                    clearInputBuffer();
-                    cout << "Некорректный ID" << endl;
-                    break;
-                }
-                clearInputBuffer();
-                
-                cout << "Группа: "; getline(cin, group);
-                cout << "Предмет: "; getline(cin, subject);
-                cout << "Преподаватель: "; getline(cin, teacher);
-                
-                cout << "День (1-7): "; 
-                if (!(cin >> temp) || temp < 1 || temp > 7) {
-                    clearInputBuffer();
-                    cout << "Некорректный день" << endl;
-                    break;
-                }
-                day = static_cast<unsigned char>(temp);
-                
-                cout << "Пара (1-4): "; 
-                if (!(cin >> temp) || temp < 1 || temp > 4) {
-                    clearInputBuffer();
-                    cout << "Некорректный номер пары" << endl;
-                    break;
-                }
-                period = static_cast<unsigned char>(temp);
-                
-                db.addItem(id, group, subject, teacher, day, period);
-                break;
-            }
-            case 4: {
-                int id;
-                cout << "ID для удаления: "; 
-                if (!(cin >> id)) {
-                    clearInputBuffer();
-                    cout << "Некорректный ID" << endl;
-                    break;
-                }
-                db.deleteItem(id);
-                break;
-            }
-            case 5: {
-                string filename;
-                cout << "Имя файла: "; cin >> filename;
-                db.saveToFile(filename);
-                break;
-            }
-            case 6:
-                db.sortById();
-                break;
-            case 7: {
-                int id;
-                cout << "ID для поиска: "; 
-                if (!(cin >> id)) {
-                    clearInputBuffer();
-                    cout << "Некорректный ID" << endl;
-                    break;
-                }
-                auto results = db.searchById(id);
-                if (results.empty()) {
-                    cout << "Записи не найдены" << endl;
-                } else {
-                    vector<string> headers = {"ID", "Группа", "Предмет", "Преподаватель", "День", "Пара"};
-                    vector<vector<string>> rows;
-                    for (const auto& item : results) {
-                        rows.push_back({
-                            to_string(item.getId()),
-                            item.getGroup(),
-                            item.getSubject(),
-                            item.getTeacher(),
-                            to_string(static_cast<int>(item.getDay())),
-                            to_string(static_cast<int>(item.getPeriod()))
-                        });
-                    }
-                    TableFormatter::printTable(headers, rows);
-                }
-                break;
-            }
-            case 8: {
-                int start, end;
-                cout << "Начальный день (1-7): "; 
-                if (!(cin >> start) || start < 1 || start > 7) {
-                    clearInputBuffer();
-                    cout << "Некорректный день" << endl;
-                    break;
-                }
-                
-                cout << "Конечный день (1-7): "; 
-                if (!(cin >> end) || end < 1 || end > 7 || end < start) {
-                    clearInputBuffer();
-                    cout << "Некорректный день" << endl;
-                    break;
-                }
-                
-                auto filtered = db.filterByDayRange(start, end);
-                if (filtered.empty()) {
-                    cout << "Записи не найдены" << endl;
-                } else {
-                    vector<string> headers = {"ID", "Группа", "Предмет", "Преподаватель", "День", "Пара"};
-                    vector<vector<string>> rows;
-                    for (const auto& item : filtered) {
-                        rows.push_back({
-                            to_string(item.getId()),
-                            item.getGroup(),
-                            item.getSubject(),
-                            item.getTeacher(),
-                            to_string(static_cast<int>(item.getDay())),
-                            to_string(static_cast<int>(item.getPeriod()))
-                        });
-                    }
-                    TableFormatter::printTable(headers, rows);
-                }
-                break;
-            }
-            case 9:
-                db.checkConflicts();
-                break;
-            case 10: {
-                string group;
-                clearInputBuffer();
-                cout << "Название группы: "; getline(cin, group);
-                db.printGroupSchedule(group);
-                break;
-            }
-            case 0:
-                cout << "Завершение программы" << endl;
-                return 0;
-            default:
-                cout << "Неверный выбор!" << endl;
+// Функция для отображения меню с подсветкой выбранного пункта
+int showMenu(const vector<string>& options, int selectedIndex) {
+    system("cls");
+    cout << "=== Управление базой данных расписания ===\n";
+    for (int i = 0; i < options.size(); ++i) {
+        if (i == selectedIndex) {
+            cout << " > " << options[i] << " \n";
+        } else {
+            cout << "   " << options[i] << " \n";
         }
     }
+    return selectedIndex;
+}
+
+// Функция для отображения подменю с возвратом в основное меню по Esc
+bool showSubMenu(const string& title, const vector<string>& options, int& selectedIndex) {
+    while (true) {
+        system("cls");
+        cout << title << "\n";
+        for (int i = 0; i < options.size(); ++i) {
+            if (i == selectedIndex) {
+                cout << " > " << options[i] << " \n";
+            } else {
+                cout << "   " << options[i] << " \n";
+            }
+        }
+        
+        int key = _getch();
+        if (key == 224) { // Специальные клавиши (стрелки)
+            key = _getch();
+            if (key == 72) { // Вверх
+                selectedIndex = (selectedIndex - 1 + options.size()) % options.size();
+            } else if (key == 80) { // Вниз
+                selectedIndex = (selectedIndex + 1) % options.size();
+            }
+        } else if (key == 13) { // Enter
+            return true;
+        } else if (key == 27) { // Esc
+            return false;
+        }
+    }
+}
+
+// Функция для ввода строки с возможностью отмены по Esc
+string inputString(const string& prompt, bool& canceled) {
+    canceled = false;
+    string value;
+    cout << prompt;
+    
+    while (true) {
+        char c = _getch();
+        if (c == 13) { // Enter
+            cout << endl;
+            return value;
+        } else if (c == 27) { // Esc
+            canceled = true;
+            cout << " (отменено)\n";
+            return "";
+        } else if (c == 8) { // Backspace
+            if (!value.empty()) {
+                value.pop_back();
+                cout << "\b \b";
+            }
+        } else if (c >= 32 && c <= 126) { // Печатные символы
+            value += c;
+            cout << c;
+        }
+    }
+}
+
+// Функция для ввода числа с возможностью отмены по Esc
+int inputInt(const string& prompt, bool& canceled) {
+    canceled = false;
+    string value;
+    cout << prompt;
+    
+    while (true) {
+        char c = _getch();
+        if (c == 13) { // Enter
+            cout << endl;
+            if (value.empty()) return 0;
+            try {
+                return stoi(value);
+            } catch (...) {
+                return 0;
+            }
+        } else if (c == 27) { // Esc
+            canceled = true;
+            cout << " (отменено)\n";
+            return 0;
+        } else if (c == 8) { // Backspace
+            if (!value.empty()) {
+                value.pop_back();
+                cout << "\b \b";
+            }
+        } else if (isdigit(c)) {
+            value += c;
+            cout << c;
+        }
+    }
+}
+
+// Основная функция программы
+int main() {
+    ScheduleDatabase db;
+    vector<string> mainMenu = {
+        "Загрузить БД из файла",
+        "Просмотреть БД",
+        "Добавить запись",
+        "Удалить запись",
+        "Сохранить БД в файл",
+        "Сортировать по ID",
+        "Поиск по ID",
+        "Фильтр по диапазону дней",
+        "Проверить накладки",
+        "Расписание группы",
+        "Выход"
+    };
+    
+    int selected = 0;
+    bool exitRequested = false;
+    
+    while (!exitRequested) {
+        showMenu(mainMenu, selected);
+        
+        int key = _getch();
+        if (key == 224) { // Специальные клавиши (стрелки)
+            key = _getch();
+            if (key == 72) { // Вверх
+                selected = (selected - 1 + mainMenu.size()) % mainMenu.size();
+            } else if (key == 80) { // Вниз
+                selected = (selected + 1) % mainMenu.size();
+            }
+        } else if (key == 13) { // Enter - выбор пункта
+            system("cls");
+            switch(selected) {
+                case 0: { // Загрузить из файла
+                    bool canceled;
+                    string filename = inputString("Имя файла: ", canceled);
+                    if (!canceled) {
+                        db.loadFromFile(filename);
+                    }
+                    cout << "Нажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                }
+                case 1: // Просмотреть БД
+                    db.displayAll();
+                    cout << "\nНажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                case 2: { // Добавить запись
+                    bool canceled;
+                    int id = inputInt("ID: ", canceled);
+                    if (canceled) break;
+                    
+                    string group = inputString("Группа: ", canceled);
+                    if (canceled) break;
+                    
+                    string subject = inputString("Предмет: ", canceled);
+                    if (canceled) break;
+                    
+                    string teacher = inputString("Преподаватель: ", canceled);
+                    if (canceled) break;
+                    
+                    int day = inputInt("День (1-7): ", canceled);
+                    if (canceled) break;
+                    
+                    int period = inputInt("Пара (1-4): ", canceled);
+                    if (canceled) break;
+                    
+                    if (day < 1 || day > 7 || period < 1 || period > 4) {
+                        cout << "Некорректные данные!\n";
+                    } else {
+                        db.addItem(id, group, subject, teacher, 
+                                  static_cast<unsigned char>(day), 
+                                  static_cast<unsigned char>(period));
+                    }
+                    cout << "Нажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                }
+                case 3: { // Удалить запись
+                    bool canceled;
+                    int id = inputInt("ID для удаления: ", canceled);
+                    if (!canceled) {
+                        db.deleteItem(id);
+                    }
+                    cout << "Нажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                }
+                case 4: { // Сохранить в файл
+                    bool canceled;
+                    string filename = inputString("Имя файла: ", canceled);
+                    if (!canceled) {
+                        db.saveToFile(filename);
+                    }
+                    cout << "Нажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                }
+                case 5: // Сортировать по ID
+                    db.sortById();
+                    cout << "Нажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                case 6: { // Поиск по ID
+                    bool canceled;
+                    int id = inputInt("ID для поиска: ", canceled);
+                    if (!canceled) {
+                        auto results = db.searchById(id);
+                        if (results.empty()) {
+                            cout << "Записи не найдены\n";
+                        } else {
+                            vector<string> headers = {"ID", "Группа", "Предмет", "Преподаватель", "День", "Пара"};
+                            vector<vector<string>> rows;
+                            for (const auto& item : results) {
+                                rows.push_back({
+                                    to_string(item.getId()),
+                                    item.getGroup(),
+                                    item.getSubject(),
+                                    item.getTeacher(),
+                                    to_string(static_cast<int>(item.getDay())),
+                                    to_string(static_cast<int>(item.getPeriod()))
+                                });
+                            }
+                            TableFormatter::printTable(headers, rows);
+                        }
+                    }
+                    cout << "\nНажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                }
+                case 7: { // Фильтр по дням
+                    bool canceled;
+                    int start = inputInt("Начальный день (1-7): ", canceled);
+                    if (canceled) break;
+                    
+                    int end = inputInt("Конечный день (1-7): ", canceled);
+                    if (canceled) break;
+                    
+                    if (start < 1 || start > 7 || end < 1 || end > 7 || end < start) {
+                        cout << "Некорректный диапазон!\n";
+                    } else {
+                        auto filtered = db.filterByDayRange(start, end);
+                        if (filtered.empty()) {
+                            cout << "Записи не найдены\n";
+                        } else {
+                            vector<string> headers = {"ID", "Группа", "Предмет", "Преподаватель", "День", "Пара"};
+                            vector<vector<string>> rows;
+                            for (const auto& item : filtered) {
+                                rows.push_back({
+                                    to_string(item.getId()),
+                                    item.getGroup(),
+                                    item.getSubject(),
+                                    item.getTeacher(),
+                                    to_string(static_cast<int>(item.getDay())),
+                                    to_string(static_cast<int>(item.getPeriod()))
+                                });
+                            }
+                            TableFormatter::printTable(headers, rows);
+                        }
+                    }
+                    cout << "\nНажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                }
+                case 8: // Проверить накладки
+                    db.checkConflicts();
+                    cout << "\nНажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                case 9: { // Расписание группы
+                    bool canceled;
+                    string group = inputString("Название группы: ", canceled);
+                    if (!canceled) {
+                        db.printGroupSchedule(group);
+                    }
+                    cout << "\nНажмите любую клавишу для возврата...";
+                    _getch();
+                    break;
+                }
+                case 10: // Выход
+                    exitRequested = true;
+                    break;
+            }
+        } else if (key == 27) { // Esc - выход из программы
+            exitRequested = true;
+        }
+    }
+    
+    cout << "Завершение программы" << endl;
+    return 0;
 }
